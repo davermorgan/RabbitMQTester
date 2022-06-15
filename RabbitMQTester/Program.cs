@@ -14,9 +14,17 @@ using (var channel = connection.CreateModel())
         string message = $"Message number {count}";
         var body = Encoding.UTF8.GetBytes(message);
 
+        // Create basic props and add headers to set the retry settings for a new message. These will be modified as the message gets retried, should it fail
+        IBasicProperties props = channel.CreateBasicProperties();
+
+        props.Headers = new Dictionary<string, object>();
+        props.Headers.Add("x-delay", 1000);
+        props.Headers.Add("x-retry", 0);
+        props.Headers.Add("x-retry-limit", 5);
+
         channel.BasicPublish(exchange: "MAIN",
                              routingKey: "mainQueue",
-                             basicProperties: null,
+                             basicProperties: props,
                              body: body);
         Console.WriteLine($"Sent {message}");
     }
@@ -27,6 +35,7 @@ Console.ReadLine();
 
 void declareQueues(IModel channel)
 {
+    channel.CreateBasicProperties();
     // Declare exchanges and queues
 
     // Main exchange uses DELAY as it's dead letter exchange
@@ -42,7 +51,7 @@ void declareQueues(IModel channel)
                     durable: true,
                     arguments: new Dictionary<string, object>()
                     {
-                                { "x-delayed-type", "fanout" }
+                                { "x-delayed-type", "direct" }
                     });
 
     channel.ExchangeDeclare(exchange: "DLX.DEAD.LETTERS",
@@ -69,7 +78,7 @@ void declareQueues(IModel channel)
                          autoDelete: false,
                          arguments: new Dictionary<string, object>()
                     {
-                                { "x-delayed-type", "fanout" },
+                                { "x-delayed-type", "direct" },
                                 { "x-dead-letter-exchange", "DLX.DEAD.LETTERS" },
                                 { "x-dead-letter-routing-key", "dlQueue" }
                     });
